@@ -1,0 +1,8 @@
+expression = factor {'+' | '-' factor};
+factor = power {'*' | '/' power};
+power = unary {'^' unary};
+unary = {'+' | '-'} | '' term;
+term = '(' expression ')' | number | function | 'x' | 'e';
+number = {digit}['.' {digit}];
+function = functioname '(' expression ')';
+digit = 0|..|9;

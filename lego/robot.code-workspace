@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": ".",
+		}
+	],
+	"settings": {
+		"debug.openDebug": "neverOpen",
+		"python.languageServer": "Pylance",
+		"cSpell.words": [
+			"pybricks"
+		]
+	}
+}
