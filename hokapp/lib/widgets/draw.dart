@@ -37,6 +37,8 @@ class _DrawProgressionState extends State<DrawProgression> {
   @override
   void initState() {
     assert(sendInfo.tex != null);
+    assert(sendInfo.socket != null);
+
     Expression expr = TeXParser(sendInfo.tex!).parse();
     expressionBytes = ascii.encode(lexer
         .tokenizeToRPN(expr.toString())
@@ -52,10 +54,7 @@ class _DrawProgressionState extends State<DrawProgression> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text(
-            'Drawing',
-            textScaleFactor: 2,
-          ),
+          const Text('Drawing'),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8.0),
             child: StreamBuilder<Uint8List>(

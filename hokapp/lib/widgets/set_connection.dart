@@ -82,7 +82,6 @@ class _SearchResultsState extends State<SearchResults> {
 
   @override
   Widget build(BuildContext context) {
-    devices.clear();
     return Center(
       child: FutureBuilder<Stream<OpenPort>>(
         future: _discoverPort(),
@@ -128,13 +127,28 @@ class _SearchResultsState extends State<SearchResults> {
     );
   }
 
-  Future<Stream<OpenPort>> _discoverPort() async {
-    devices.clear();
+  Future<String> _getSubnet() async {
     String? ip = await _ip;
     if (ip == null) {
       throw Exception('No IP found. Maybe on mobile data?');
     }
-    final String subnet = ip.substring(0, ip.lastIndexOf('.'));
+    return ip.substring(0, ip.lastIndexOf('.'));
+  }
+
+  Future<Stream<OpenPort>> _discoverPort() async {
+    String subnet = await _getSubnet();
+    deviceStream = HostScanner.discoverPort(
+      subnet,
+      brickPort,
+      resultsInIpAscendingOrder: false,
+      timeout: const Duration(seconds: 3),
+    );
+    return deviceStream;
+  }
+
+  Future<void> _pullRefresh() async {
+    devices.clear();
+    String subnet = await _getSubnet();
     setState(() {
       deviceStream = HostScanner.discoverPort(
         subnet,
@@ -143,11 +157,6 @@ class _SearchResultsState extends State<SearchResults> {
         timeout: const Duration(seconds: 3),
       );
     });
-    return deviceStream;
-  }
-
-  Future<void> _pullRefresh() async {
-    await _discoverPort();
     await Future.delayed(const Duration(seconds: 2));
   }
 }
@@ -196,8 +205,11 @@ class _ConnectionTileState extends State<ConnectionTile> {
                       widget.addr.port,
                       timeout: const Duration(seconds: 3),
                     );
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('Connected to ${widget.addr.ip}')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Connected to ${widget.addr.ip}'),
+                      ),
+                    );
                     Navigator.popAndPushNamed(context, '/home');
                   } on Exception catch (e) {
                     showErrorDialog(context, e);

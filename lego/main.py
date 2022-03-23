@@ -41,7 +41,7 @@ ANGLE_RATIO = 18
 
 
 
-class Plot:
+class Plotter:
     def __init__(self, expression, current_x = X_LEFT_BOUND, current_y = Y_UPPER_BOUND, lifted = False):
         """from top left to bottom right"""
         self.f = expression

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 ThemeData hokThemeLight = ThemeData(
+  brightness: Brightness.light,
   colorSchemeSeed: Colors.blue,
   fontFamily: 'Encode Sans Expanded',
   snackBarTheme: const SnackBarThemeData(
@@ -11,6 +12,7 @@ ThemeData hokThemeLight = ThemeData(
 );
 
 ThemeData hokThemeDark = ThemeData(
+  brightness: Brightness.dark,
   colorSchemeSeed: Colors.lime,
   fontFamily: 'Encode Sans Expanded',
   snackBarTheme: const SnackBarThemeData(
