@@ -200,11 +200,13 @@ class _ConnectionTileState extends State<ConnectionTile> {
                     _isLoading = true;
                   });
                   try {
-                    sendInfo.socket = await Socket.connect(
+                    Socket socket = await Socket.connect(
                       widget.addr.ip,
                       widget.addr.port,
                       timeout: const Duration(seconds: 3),
                     );
+                    sendInfo.socket?.destroy();
+                    sendInfo.socket = socket;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Connected to ${widget.addr.ip}'),

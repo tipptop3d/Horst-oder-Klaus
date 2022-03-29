@@ -11,6 +11,7 @@ class ThemeModeNotifier extends ValueNotifier<ThemeMode> {
 
   bool isLight() => value == ThemeMode.light;
   bool isDark() => value == ThemeMode.dark;
+  bool isSystem() => value == ThemeMode.system;
 
   void switchMode() {
     switch (value) {
@@ -48,8 +49,9 @@ class SendInfoNotifier extends ValueNotifier<bool> {
 
   set socket(Socket? socket) {
     _socket = socket;
-    broadcast = _socket?.asBroadcastStream();
-    checkCanSend();
+    if (checkCanSend()) {
+      broadcast = _socket?.asBroadcastStream();
+    }
   }
 
   bool checkCanSend() {

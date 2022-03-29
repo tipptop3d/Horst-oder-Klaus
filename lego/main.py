@@ -31,46 +31,53 @@ Y_LENGTH = 60
 Y_UPPER_BOUND = Y_LENGTH/2
 Y_LOWER_BOUND = -Y_LENGTH/2
 
+X_SPEED = 180
 X_MAX_SPEED = 360
 Y_MAX_SPEED = 360
+
+ANGLE_LIFTED = 0
+ANGLE_LOWERED = 180
 
 PRECISION = 100 # 100 intervals
 
 # wir gehen jetzt davon aus, dass eine Umdrehung (360°) 20mm Distanz enstpricht
+# Distanz in mm * ANGLE_RATIO = Grad
+# Grad / ANGLE_RATIO = Distanz
 ANGLE_RATIO = 18
 
 
 
 class Plotter:
-    def __init__(self, expression, current_x = X_LEFT_BOUND, current_y = Y_UPPER_BOUND, lifted = False):
+    def __init__(self, expression, stream = None, current_x = X_LEFT_BOUND, current_y = Y_UPPER_BOUND, lifted = False):
         """from top left to bottom right"""
         self.f = expression
+        self.stream = stream
 
         self.current_x = current_x
         self.current_y = current_y
 
         self.lifted = lifted
         if lifted:
-            motorZ.reset_angle(0)
+            motorZ.reset_angle(ANGLE_LIFTED)
         else:
-            motorZ.reset_angle(180)
+            motorZ.reset_angle(ANGLE_LOWERED)
 
     @property
     def ratio(self):
         return self.max_x / self.max_y
 
-    def lift_up(self):
+    def lift(self):
         if self.lifted:
             return
 
-        motorZ.run_target(360, 0)
+        motorZ.run_target(360, ANGLE_LIFTED)
         self.lifted = True
     
-    def lift_down(self):
+    def lower(self):
         if not self.lifted:
             return
 
-        motorZ.run_target(360, 180)
+        motorZ.run_target(360, ANGLE_LOWERED)
         self.lifted = False
 
     def move_to(self, x=None, y=None, wait=False):
@@ -97,12 +104,12 @@ class Plotter:
         motorY.run_angle(Y_MAX_SPEED, angle_y, wait=wait)
 
         if not was_lifted:
-            self.lift_down()
+            self.lower()
 
         self.current_x = x
         self.current_y = y
     
-    def draw(self):
+    async def draw(self):
         fp = self.f.diff()
         self.lift_up()
 
@@ -119,15 +126,16 @@ class Plotter:
         # draw
         # 20 mm/s, Strecke := 100 - current_x, t := strecke / 20 mm/s
         s = X_LENGTH - self.current_x
-        t = s / (X_MAX_SPEED / ANGLE_RATIO)
+        t = s / (X_SPEED / ANGLE_RATIO)
         interval = t / PRECISION
         current_time = 0
-        motorX.run(X_MAX_SPEED)
+        motorX.run(X_SPEED)
         while current_time <= t:
             self.current_x += 1
             current_time += interval
             
             current_y = self.f.evaluate(self.current_x)
+            y_speed = X_SPEED * fp.evaluate(self.current_x)
 
             if not Y_LOWER_BOUND > current_y > Y_UPPER_BOUND:
                 self.lift_up()
@@ -136,10 +144,14 @@ class Plotter:
                 continue
 
             self.current_y = current_y
-            self.lift_down()
+            self.lower()
 
-            y_speed = fp.evaluate(self.current_x)
+            y_speed = X_SPEED * fp.evaluate(self.current_x)
             motorY.run(y_speed)
+            if self.stream:
+                percentage = round(t / current_time * 255)
+                byte = (percentage).to_bytes(1, 'big', signed=False)
+                await self.stream.awrite(byte)
             wait(interval)
         motorX.hold()
         motorY.hold()
@@ -150,11 +162,8 @@ async def print_callback(reader, writer):
     res = await reader.readline()
     expr = Expression(res)
     print('Expression: ', expr)
-
-    for x in range(50, 255):
-        byte = (x).to_bytes(1, 'big', signed=False)
-        await writer.awrite(byte)
-        await uasyncio.sleep(0.1)
+    plotter = Plotter(expr, writer)
+    await plotter.draw()
     await reader.aclose()
     print('Released')
 
