@@ -19,6 +19,13 @@
 			"editor.tabCompletion": "onlySnippets",
 			"editor.wordBasedSuggestions": false,
 		},
-		"svg.preview.background": "editor"
+		"svg.preview.background": "editor",
+		"[python]": {
+			"gitlens.codeLens.symbolScopes": [
+				"!Module"
+			],
+			"editor.rulers": [72, 79],
+			"editor.wordBasedSuggestions": false
+		}
 	}
 }
