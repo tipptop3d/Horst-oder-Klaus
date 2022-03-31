@@ -56,7 +56,7 @@ class CustomIPField extends StatelessWidget {
               content: Text('Connected to $value'),
             ),
           );
-          Navigator.popAndPushNamed(context, '/input');
+          Navigator.popAndPushNamed(context, '/home');
         } on Exception catch (e) {
           showErrorDialog(context, e);
         }

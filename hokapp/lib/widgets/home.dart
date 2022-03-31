@@ -44,6 +44,7 @@ class HomeMenu extends StatelessWidget {
                     }
                   },
                 ),
+                const LiftedCheckBox()
               ],
             ),
           ),
@@ -51,6 +52,31 @@ class HomeMenu extends StatelessWidget {
         floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
         floatingActionButton: const DrawActionButton(),
       ),
+    );
+  }
+}
+
+class LiftedCheckBox extends StatefulWidget {
+  const LiftedCheckBox({Key? key}) : super(key: key);
+
+  @override
+  State<LiftedCheckBox> createState() => _LiftedCheckBoxState();
+}
+
+class _LiftedCheckBoxState extends State<LiftedCheckBox> {
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Text('Pen Lifted?'),
+        Checkbox(
+            value: isLifted,
+            onChanged: (bool? value) {
+              setState(() {
+                isLifted = value!;
+              });
+            })
+      ],
     );
   }
 }

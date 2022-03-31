@@ -3,176 +3,186 @@
 """
 Main File that gets executed by the Lego Robot
 """
+import json
+import math
+
+from pybricks.ev3devices import (ColorSensor, GyroSensor, InfraredSensor,
+                                 Motor, TouchSensor, UltrasonicSensor)
 from pybricks.hubs import EV3Brick
-from pybricks.ev3devices import (Motor, TouchSensor, ColorSensor,
-                                 InfraredSensor, UltrasonicSensor, GyroSensor)
-from pybricks.parameters import Port, Stop, Direction, Button, Color
-from pybricks.tools import wait, StopWatch, DataLog
+from pybricks.media.ev3dev import ImageFile, SoundFile
+from pybricks.parameters import Button, Color, Direction, Port, Stop
 from pybricks.robotics import DriveBase
-from pybricks.media.ev3dev import SoundFile, ImageFile
+from pybricks.tools import DataLog, StopWatch, wait
 
-
-# This program requires LEGO EV3 MicroPython v2.0 or higher.
-# Click "Open user guide" on the EV3 extension tab for more information.
 import uasyncio
-from .calculus.expression import Expression
+from calculus.expression import Expression
 
-DRAW_ASPECT_RATIO = 10/6 # x:y
+# Motors
 
-motorX = Motor(Port.A, gears=[20, 16])
-motorY = Motor(Port.B, gears=[16])
-motorZ = Motor(Port.C)
+motor_x = Motor(Port.A, gears=[20, 16])
+motor_y = Motor(Port.B, gears=[16])
+motor_z = Motor(Port.C)
 
-X_LENGTH = 100
+# in mm
+X_LENGTH = 127
 X_LEFT_BOUND = -X_LENGTH/2
 X_RIGHT_BOUND = X_LENGTH/2
 
-Y_LENGTH = 60
+Y_LENGTH = 91
 Y_UPPER_BOUND = Y_LENGTH/2
 Y_LOWER_BOUND = -Y_LENGTH/2
 
-X_SPEED = 180
-X_MAX_SPEED = 360
-Y_MAX_SPEED = 360
+# in °/s
+X_MAX_ANGLE_SPEED = 360
+Y_MAX_ANGLE_SPEED = 720
 
-ANGLE_LIFTED = 0
-ANGLE_LOWERED = 180
+# in °
+ANGLE_TO_LIFT = 90
 
-PRECISION = 100 # 100 intervals
+# Distance driven = the amount of degrees multiplied by the angle ratio
+# distance = angle * ANGLE_RATIO
+# Angle needed for given distance = distance divided by angle ratio
+# angle = distance / ANGLE_RATIO
+# Same for speeds (replace distance with distance/time or angle with angle/time)
+SIXTEEN_TEETH_GEAR_DIAMETER = 17.5  # mm
+CIRCUMFERENCE = SIXTEEN_TEETH_GEAR_DIAMETER * math.pi
+ANGLE_RATIO = CIRCUMFERENCE * (1/360)
 
-# wir gehen jetzt davon aus, dass eine Umdrehung (360°) 20mm Distanz enstpricht
-# Distanz in mm * ANGLE_RATIO = Grad
-# Grad / ANGLE_RATIO = Distanz
-ANGLE_RATIO = 18
-
+# somehow the precision alters the speed, so maybe resulting in bugs
+# if these bugs influences influence the real drawings, fuck a
+# new algorithm is needed
+PRECISION = 100  # intervals
 
 
 class Plotter:
-    def __init__(self, expression, stream = None, current_x = X_LEFT_BOUND, current_y = Y_UPPER_BOUND, lifted = False):
-        """from top left to bottom right"""
-        self.f = expression
-        self.stream = stream
-
+    def __init__(self, current_x=X_LEFT_BOUND, current_y=Y_UPPER_BOUND, lifted=False):
         self.current_x = current_x
         self.current_y = current_y
 
         self.lifted = lifted
-        if lifted:
-            motorZ.reset_angle(ANGLE_LIFTED)
-        else:
-            motorZ.reset_angle(ANGLE_LOWERED)
 
-    @property
-    def ratio(self):
-        return self.max_x / self.max_y
+        # testing range
+        self.move_to(0, 0)
+        self.move_to(X_RIGHT_BOUND, Y_UPPER_BOUND)
+        self.move_to(y=Y_LOWER_BOUND)
+        self.move_to(x=X_LEFT_BOUND)
+        self.move_to(y=Y_UPPER_BOUND)
 
-    def lift(self):
+    def lift(self, wait=True):
         if self.lifted:
             return
 
-        motorZ.run_target(360, ANGLE_LIFTED)
+        motor_z.run_angle(360, ANGLE_TO_LIFT, wait=wait)
         self.lifted = True
-    
-    def lower(self):
+
+    def lower(self, wait=True):
         if not self.lifted:
             return
 
-        motorZ.run_target(360, ANGLE_LOWERED)
+        motor_z.run_angle(360, -ANGLE_TO_LIFT, wait=wait)
         self.lifted = False
 
-    def move_to(self, x=None, y=None, wait=False):
+    def move_to(self, x=None, y=None, wait=True, x_wait=False):
+        # no value, no movement
         if x is None:
             x = self.current_x
         if y is None:
             y = self.current_y
 
+        # same position, no movement needed
         if x == self.current_x and y == self.current_y:
             return
 
-        if not (X_LEFT_BOUND < x < X_RIGHT_BOUND or Y_LOWER_BOUND < y < Y_UPPER_BOUND):
+        if not (X_LEFT_BOUND <= x <= X_RIGHT_BOUND or Y_LOWER_BOUND <= y <= Y_UPPER_BOUND):
             raise ValueError('Values out of bounds')
-        
-        angle_x = (x - self.current_x) * ANGLE_RATIO
-        angle_y = (y - self.current_y) * ANGLE_RATIO
 
+        angle_x = (x - self.current_x) / ANGLE_RATIO
+        angle_y = (y - self.current_y) / ANGLE_RATIO
+
+        # make sure to lift before moving, but retain old lift status
         was_lifted = self.lifted
-
         if not self.lifted:
-            self.lift_up()
+            self.lift()
 
-        motorX.run_angle(X_MAX_SPEED, angle_x, wait=False)
-        motorY.run_angle(Y_MAX_SPEED, angle_y, wait=wait)
+        motor_x.run_angle(X_MAX_ANGLE_SPEED, angle_x, wait=x_wait)
+        motor_y.run_angle(Y_MAX_ANGLE_SPEED, angle_y, wait=wait)
 
         if not was_lifted:
             self.lower()
 
         self.current_x = x
         self.current_y = y
-    
-    async def draw(self):
-        fp = self.f.diff()
-        self.lift_up()
 
-         # find start
-        coords = None
-        for x in range(X_RIGHT_BOUND, X_LEFT_BOUND+1):
-            y = self.f.evaluate(x)
-            if -30 < y < 30:
-                coords = x, y
-                break
-        
-        self.move_to(*coords)
+    def draw(self, expression):
+        """Draws the expression.
 
-        # draw
-        # 20 mm/s, Strecke := 100 - current_x, t := strecke / 20 mm/s
-        s = X_LENGTH - self.current_x
-        t = s / (X_SPEED / ANGLE_RATIO)
-        interval = t / PRECISION
-        current_time = 0
-        motorX.run(X_SPEED)
-        while current_time <= t:
-            self.current_x += 1
-            current_time += interval
-            
-            current_y = self.f.evaluate(self.current_x)
-            y_speed = X_SPEED * fp.evaluate(self.current_x)
+        Args:
+            expression (Expression): Expression to draw
+        """
+        # first derative
+        fp = expression.diff()
 
-            if not Y_LOWER_BOUND > current_y > Y_UPPER_BOUND:
-                self.lift_up()
-                motorY.hold()
-                wait(interval)
-                continue
+        self.lift()
+        self.move_to(X_LEFT_BOUND, Y_UPPER_BOUND)
 
-            self.current_y = current_y
-            self.lower()
+        # calculate timings
+        x_speed = (X_MAX_ANGLE_SPEED * ANGLE_RATIO)
+        total_time = X_LENGTH / x_speed
+        average_time = total_time / PRECISION
 
-            y_speed = X_SPEED * fp.evaluate(self.current_x)
-            motorY.run(y_speed)
-            if self.stream:
-                percentage = round(t / current_time * 255)
-                byte = (percentage).to_bytes(1, 'big', signed=False)
-                await self.stream.awrite(byte)
-            wait(interval)
-        motorX.hold()
-        motorY.hold()
+        # draw loop
+        while self.current_x < X_RIGHT_BOUND:
+            print(f'Coords: {self.current_x:.2f} {self.current_y:.2f}')
+            x_angle_speed = X_MAX_ANGLE_SPEED
+            y_speed = fp.evaluate(self.current_x)
+            y_angle_speed = y_speed / ANGLE_RATIO
+            abs_y_angle_speed = abs(y_angle_speed)
+
+            speed_factor = 1.0
+            # if y-speed exceeds, slow down x-motor to retain ratio
+            # speed factor is the ratio of y to y_max
+            # dividing it with our x-speed gives the lowered x-speed retaining ratio
+            if abs_y_angle_speed > Y_MAX_ANGLE_SPEED:
+                speed_factor = abs_y_angle_speed / Y_MAX_ANGLE_SPEED
+                y_angle_speed = math.copysign(Y_MAX_ANGLE_SPEED, y_speed)
+                x_angle_speed /= speed_factor
+
+            motor_y.run(y_angle_speed)
+            motor_x.run(x_angle_speed)
+
+            # average time multiplied with speed factor gives the time
+            time_spent = average_time * speed_factor
+
+            # distance = velocity * time | s = v · t
+            self.current_y += (y_angle_speed * ANGLE_RATIO) * time_spent
+            self.current_x += (x_angle_speed * ANGLE_RATIO) * time_spent
+
+            wait(time_spent)
+
+        motor_x.hold()
+        motor_y.hold()
 
 
 async def print_callback(reader, writer):
     print('Connected with:', writer.get_extra_info('peername'))
     res = await reader.readline()
-    expr = Expression(res)
-    print('Expression: ', expr)
-    plotter = Plotter(expr, writer)
-    await plotter.draw()
-    await reader.aclose()
+    try:
+        obj = json.loads((res.decode('ascii')))
+        expr = Expression(obj['tokens'])
+        print('Expression: ', expr)
+        plotter = Plotter()
+        plotter.draw_test(expr)
+    except Exception as e:
+        print(e)
+    reader.aclose()
     print('Released')
+
 
 async def main():
     print('Started Server')
     server = await uasyncio.start_server(print_callback, '0.0.0.0', 64010, 1)
     await server.wait_closed()
     print('Closed Server')
-
 
 
 loop = uasyncio.core.get_event_loop()

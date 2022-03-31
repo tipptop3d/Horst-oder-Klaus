@@ -76,21 +76,21 @@ class _Token:
         self.value = value
 
 
-def _pythonize(token: str):
+def _tokenize(token: str):
     _type, value = token.strip('()').split(':')
     return _Token(TYPE_PATTERN[_type], value)
 
 
-def _parse(input_bytes):
+def _parse(tokens):
     expr_stack = []
-    input_stream = [_pythonize(token) for token in input_bytes.decode().split('\x1f')]
+    input_stream = [_tokenize(token) for token in tokens]
 
     for token in input_stream:
         if token._type == TokenType.VAL:
             if token.value == 2.718281828459045:
                 curr_expr = Constant('e')
             else:
-                curr_expr = Number(token.value)
+                curr_expr = Number(float(token.value))
 
         if token._type == TokenType.VAR:
             curr_expr = Variable()
@@ -183,9 +183,9 @@ class Expression:
                   x   3
     """
 
-    def __init__(self, bytes_input=None, root=None):
-        if bytes_input:
-            self.tree = _parse(bytes_input)
+    def __init__(self, tokens=None, root=None):
+        if tokens:
+            self.tree = _parse(tokens)
         else:
             self.tree = root
 

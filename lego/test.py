@@ -1,77 +1,221 @@
-from calculus.expression import Expression
+"""
+Test File
+"""
 import math
+import matplotlib.pyplot as plt
 
-X_LENGTH = 100
-Y_LENGTH = 60
-X_MAX_SPEED = 360
+import time
+from calculus.expression import Expression
 
-# wir gehen jetzt davon aus, dass eine Umdrehung (360°) 20mm Distanz enstpricht
-# 
+# Dummies
 
-class Plot:
-    def __init__(self, max_x, max_y, current_x = 0, current_y = 0) -> None:
-        """from top left to bottom right"""
-        self.max_x = max_x
-        self.max_y = max_y
+
+class Port:
+    A = 'A'
+    B = 'B'
+    C = 'C'
+
+
+class Motor:
+    def __init__(self, port, gears=None) -> None:
+        self.port = port
+        self.gears = gears
+
+    def run_angle(self, speed, angle, wait=True):
+        # print('{}: Running to angle {} at speed {}'.format(self.port, speed, angle))
+        pass
+
+    def run(self, speed):
+        # print('{}: Running at speed {}'.format(self.port, speed))
+        pass
+
+    def hold(self):
+        pass
+
+
+def wait(ms):
+    time.sleep(ms)
+
+
+DRAW_ASPECT_RATIO = 10/6  # x:y
+
+# Motors
+
+motor_x = Motor(Port.A, gears=[20, 16])
+motor_y = Motor(Port.B, gears=[16])
+motor_z = Motor(Port.C)
+
+# in mm
+
+X_LENGTH = 127
+X_LEFT_BOUND = -X_LENGTH/2
+X_RIGHT_BOUND = X_LENGTH/2
+
+Y_LENGTH = 91
+Y_UPPER_BOUND = Y_LENGTH/2
+Y_LOWER_BOUND = -Y_LENGTH/2
+
+# in °/s
+
+X_MAX_ANGLE_SPEED = 360
+Y_MAX_ANGLE_SPEED = 720
+
+# in °
+
+ANGLE_TO_LIFT = 90
+
+# Distance driven equals the amount of degrees multiplied by the angle ratio
+# distance = angle * ANGLE_RATIO
+# Angle needed for given distance is distance divided by angle ratio
+# angle = distance / ANGLE_RATIO
+# Same for speeds (replace distance with distance/time or angle with angle/time)
+
+SIXTEEN_TEETH_GEAR_DIAMETER = 17.5  # mm
+CIRCUMFERENCE = SIXTEEN_TEETH_GEAR_DIAMETER * math.pi
+ANGLE_RATIO = CIRCUMFERENCE * (1/360)
+
+PRECISION = 100  # 100 intervals
+# somehow the precision alters the speed, so maybe resulting in bugs
+# if these bugs influences influence the real drawings
+# fuck new algorithm is needed
+
+
+class Plotter:
+    def __init__(self, current_x=X_LEFT_BOUND, current_y=Y_UPPER_BOUND, lifted=False):
         self.current_x = current_x
         self.current_y = current_y
 
-        self.CONVERSION_RATIO = 10
+        self.lifted = lifted
 
-    @property
-    def ratio(self):
-        return self.max_x / self.max_y
+        # testing range
+        self.move_to(0, 0)
+        self.move_to(X_RIGHT_BOUND, Y_UPPER_BOUND)
+        self.move_to(y=Y_LOWER_BOUND)
+        self.move_to(x=X_LEFT_BOUND)
+        self.move_to(y=Y_UPPER_BOUND)
 
-    def move_to(self, x, y):
-        if x > self.max_x or y > self.max_y:
+    def lift(self, wait=True):
+        if self.lifted:
+            return
+
+        motor_z.run_angle(360, ANGLE_TO_LIFT, wait=wait)
+        self.lifted = True
+
+    def lower(self, wait=True):
+        if not self.lifted:
+            return
+
+        motor_z.run_angle(360, -ANGLE_TO_LIFT, wait=wait)
+        self.lifted = False
+
+    def move_to(self, x=None, y=None, wait=True, x_wait=False):
+        # no value, no movement
+        if x is None:
+            x = self.current_x
+        if y is None:
+            y = self.current_y
+
+        # same position, no movement needed
+        if x == self.current_x and y == self.current_y:
+            return
+
+        if not (X_LEFT_BOUND <= x <= X_RIGHT_BOUND or Y_LOWER_BOUND <= y <= Y_UPPER_BOUND):
             raise ValueError('Values out of bounds')
-        
-        distance_x = x - self.current_x
-        distance_y = y - self.current_y
 
-        
+        angle_x = (x - self.current_x) / ANGLE_RATIO
+        angle_y = (y - self.current_y) / ANGLE_RATIO
+
+        # make sure to lift before moving, but retain old lift status
+        was_lifted = self.lifted
+        if not self.lifted:
+            self.lift()
+
+        motor_x.run_angle(X_MAX_ANGLE_SPEED, angle_x, wait=x_wait)
+        motor_y.run_angle(Y_MAX_ANGLE_SPEED, angle_y, wait=wait)
+
+        if not was_lifted:
+            self.lower()
+
+        self.current_x = x
+        self.current_y = y
+
+    def draw(self, expression):
+        """Draws the expression.
+
+        Args:
+            expression (Expression): Expression to draw
+        """
+        # first derative
+        fp = expression.diff()
+
+        self.lift()
+        self.move_to(X_LEFT_BOUND, Y_UPPER_BOUND)
+
+        x_points = []
+        y_points = []
+
+        # calculate timings
+        x_speed = (X_MAX_ANGLE_SPEED * ANGLE_RATIO)
+        total_time = X_LENGTH / x_speed
+        average_time = total_time / PRECISION
+
+        # draw loop
+
+        # timing debug
+        start_time = time.time()
+
+        while self.current_x < X_RIGHT_BOUND:
+            print(f'Coords: {self.current_x:.2f} {self.current_y:.2f}')
+            x_angle_speed = X_MAX_ANGLE_SPEED
+            y_speed = fp.evaluate(self.current_x)
+            y_angle_speed = y_speed / ANGLE_RATIO
+            abs_y_angle_speed = abs(y_angle_speed)
+
+            speed_factor = 1.0
+            # if y-speed exceeds, slow down x-motor to retain ratio
+            # speed factor is the ratio of y to y_max
+            # dividing it with our x-speed gives the lowered x-speed retaining ratio
+            if abs_y_angle_speed > Y_MAX_ANGLE_SPEED:
+                speed_factor = abs_y_angle_speed / Y_MAX_ANGLE_SPEED
+                y_angle_speed = math.copysign(Y_MAX_ANGLE_SPEED, y_speed)
+                x_angle_speed /= speed_factor
+
+            motor_y.run(y_angle_speed)
+            motor_x.run(x_angle_speed)
+
+            # average time multiplied with speed factor gives the time
+            time_spent = average_time * speed_factor
+
+            # distance = velocity * time | s = v · t
+            self.current_y += (y_angle_speed * ANGLE_RATIO) * time_spent
+            self.current_x += (x_angle_speed * ANGLE_RATIO) * time_spent
+
+            # scatter diagram
+            x_points.append(self.current_x)
+            y_points.append(self.current_y)
+            if speed_factor != 1.0:
+                print(f'{speed_factor=:.2f}')
+            wait(time_spent)
+
+        motor_x.hold()
+        motor_y.hold()
+
+        actual = time.time() - start_time
+        print(f'{total_time=:.2f}s')
+        print(f'{actual=:.2f}s')
+
+        plt.scatter(x_points, y_points)
+        plt.show()
 
 
-def int_length(n):
-    if 0 > n > 1:
-        return int(math.log10(n))-1
-    elif n > 0:
-        return int(math.log10(n))+1
-    elif n < 0:
-        return int(math.log10(n))+1
-    else:
-        return 1
-
-def draw_expr(f, start = -5, end = 5):
-    f_prime = f.diff()
-
-    # calculate min and max
-    y_values = set()
-    step = (end - start) / 1000
-    round_to = max(4 - int_length(end - start), 0)
-    print(round_to)
-
-    count = 0
-    while True:
-        n = round(start + count * step, round_to)
-        if n > end:
-            break
-        print(n)
-        y_values.add(f.evaluate(n))
-        count += 1
-    
-    max_value = max(y_values) # margin
-    min_value = min(y_values)
-
-
-
-    return max_value, min_value
-
-
-def test():
-    f = Expression('x ^ 2')
-    print(draw_expr(f, 0, 1))
+def main():
+    p = Plotter()
+    # tokens = ['(VAL:0.1)', '(VAR:x)', '(TIMES:*)', '(SIN:sin)', '(VAL:30.0)', '(TIMES:*)']
+    tokens = ['(VAL:10)', '(VAR:x)', '(VAL:2.0)', '(POW:^)', '(TIMES:*)']
+    tokens = ['(VAR:x']
+    expr = Expression(tokens)
+    p.draw(expr)
 
 
 if __name__ == '__main__':
-    test()
+    main()

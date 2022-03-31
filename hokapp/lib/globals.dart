@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 const brickPort = 64010;
 Stream<Uint8List>? broadcast;
+bool isLifted = false;
 
 class ThemeModeNotifier extends ValueNotifier<ThemeMode> {
   ThemeModeNotifier(ThemeMode value) : super(value);

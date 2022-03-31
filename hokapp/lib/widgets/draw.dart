@@ -36,16 +36,20 @@ class _DrawProgressionState extends State<DrawProgression> {
 
   @override
   void initState() {
-    assert(sendInfo.tex != null);
-    assert(sendInfo.socket != null);
+    super.initState();
+    assert(sendInfo.tex != null && sendInfo.socket != null);
 
     Expression expr = TeXParser(sendInfo.tex!).parse();
-    expressionBytes = ascii.encode(lexer
+    List<String> tokens = lexer
         .tokenizeToRPN(expr.toString())
         .map((e) => e.toString().replaceAll(' ', ''))
-        .join('\x1f'));
-    sendInfo.socket!.add(expressionBytes);
-    super.initState();
+        .toList();
+
+    Map<String, Object> info = {'tokens': tokens, 'lifted': isLifted};
+
+    String infoJson = json.encode(info);
+
+    sendInfo.socket!.write(infoJson);
   }
 
   @override
