@@ -1,3 +1,4 @@
+"""Acos node"""
 import math
 
 from calculus.nodes import negate
@@ -6,7 +7,7 @@ from . import divide, multiply, node, number, power, sqrt, subtract
 
 
 class Acos(node.Node):
-    """Negation Node"""
+    """Acos node"""
 
     def __init__(self, arg):
         self.arg = arg

@@ -1,20 +1,23 @@
+"""Constant node"""
+
 import math
 
 from ..exception import UnknownConstant
 from . import node, number
 
+
 class Constant(node.Node):
-    """Constant Node. Looks up the math module"""
+    """Constant node. Multiton. Looks up the math module"""
 
     _instances = dict()
 
     def __new__(cls, name):
         if name in cls._instances:
             return cls._instances[name]
-        else:
-            obj = super(Constant, cls).__new__(cls)
-            cls._instances[name] = obj
-            return obj
+
+        obj = super(Constant, cls).__new__(cls)
+        cls._instances[name] = obj
+        return obj
 
     def __init__(self, name):
         self.name = name

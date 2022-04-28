@@ -1,10 +1,12 @@
+"""Tan node"""
+
 import math
 
 from . import cos, divide, multiply, node, number, power
 
 
 class Tan(node.Node):
-    """Negation Node"""
+    """Tan node"""
 
     def __init__(self, arg):
         self.arg = arg

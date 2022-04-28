@@ -1,9 +1,10 @@
+"""Variable node"""
+
 from . import node, number
 
 
 class Variable(node.Node):
-    def __init__(self):
-        pass
+    """Variable node. Represents x in an Expression"""
 
     def copy(self):
         return Variable()

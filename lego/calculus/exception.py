@@ -13,5 +13,6 @@ class DifferentationError(Exception):
 class TokenizingError(Exception):
     """Raises if an error occurs while parsing"""
 
+
 class UnknownConstant(Exception):
     """Raises if an unknown constant is evaluated"""

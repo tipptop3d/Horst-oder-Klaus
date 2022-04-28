@@ -1,18 +1,25 @@
+"""Root node"""
+
 from . import divide, node, number, power
 
 
 class Root(node.Node):
-    """Negation Node"""
+    """Root node"""
 
-    def __init__(self, n, arg):
-        self.n = n
-        self.arg = arg
-    
+    def __init__(self, degree, radicand):
+        self.degree = degree
+        self.radicand = radicand
+
     def power(self):
-        return power.Pow(self.arg, divide.Divide(number.Number(1), self.n))
+        """Returns a representation of a root as a power
+
+        :return: Power Representation
+        :rtype: Node
+        """
+        return power.Pow(self.radicand, divide.Divide(number.Number(1), self.degree))
 
     def copy(self):
-        return Root(self.arg.copy())
+        return Root(self.degree.copy(), self.radicand.copy())
 
     def evaluate(self, value):
         return self.power().evaluate(value)
@@ -21,9 +28,8 @@ class Root(node.Node):
         return self.power().diff()
 
     def simplify(self):
-        self.arg = self.arg.simplify()
-
+        self.radicand = self.radicand.simplify()
         return super().simplify()
 
     def to_infix(self):
-        return 'nrt({},{})'.format(self.base, self.arg.to_infix())
+        return 'nrt({},{})'.format(self.degree.to_infix(), self.radicand.to_infix())

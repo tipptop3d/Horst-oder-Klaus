@@ -1,10 +1,12 @@
+"""natural logarithm node"""
+
 import math
 
 from . import divide, node, number
 
 
 class Ln(node.Node):
-    """Negation Node"""
+    """natural logarithm node"""
 
     def __init__(self, arg):
         self.arg = arg

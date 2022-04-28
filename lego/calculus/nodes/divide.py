@@ -1,8 +1,17 @@
+"""Division node"""
+
 from . import multiply, node, number, power, subtract
 
 
 class Divide(node.Node):
-    """Division Node"""
+    """Division node"""
+
+    def __init__(self, left=None, right=None):
+        self.left = left
+        self.right = right
+
+    def copy(self):
+        return Divide(self.left.copy(), self.right.copy())
 
     def evaluate(self, value):
         return self.left.evaluate(value) / self.right.evaluate(value)

@@ -1,22 +1,24 @@
-class Node:
-    """Node for the binary tree"""
+"""node"""
 
-    def __init__(self, left=None, right=None):
-        self.left = left
-        self.right = right
+
+class Node:
+    """Abstract base class Node for the binary tree."""
 
     def copy(self):
-        return self.__class__(self.left.copy(), self.right.copy())
+        """Returns a deep copy of a node
 
-    def evaluate(self, **kwargs):
+        :return: Copied node
+        :rtype: Node
+        """
+
+    def evaluate(self, value) -> float:
         """Evaluates the result of a Expression recursively, substituting
-        kwargs to variables. Trying to evaluate a Expression with undefined
-        variables leads to an error. First positional argument is counted as
-        x.
+        x with value.
 
-        Example:
-        f = Expression('(y+2)*x')
-        f(2, y=3) -> (3+2)*2 -> 10
+        :param value: value for x
+        :type value: int | float
+        :return: Result of calculation
+        :rtype: float
         """
 
     def to_infix(self):
@@ -24,7 +26,7 @@ class Node:
 
     def diff(self):
         "Returns a Expression Tree representing the derivative of the function"
-    
+
     def simplify(self):
         """Tries to simplify the Expression as much as possible
         Trying to implement:
@@ -39,7 +41,7 @@ class Node:
             - x ^ 1 -> x
             - x * (y / z) -> (x * y) / z
 
-            TODO: 
+            TODO:
             - Simplifying Fractions
             - Unifiying same denominator / Fraction Rules
             - Power Rules

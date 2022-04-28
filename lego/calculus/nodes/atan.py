@@ -1,10 +1,12 @@
+"""Arctan node"""
+
 import math
 
 from . import add, divide, multiply, node, number, power
 
 
 class Atan(node.Node):
-    """Negation Node"""
+    """Arctan node"""
 
     def __init__(self, arg):
         self.arg = arg

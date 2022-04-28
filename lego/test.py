@@ -1,6 +1,7 @@
 """
 Test File
 """
+import asyncio
 import math
 import matplotlib.pyplot as plt
 
@@ -74,25 +75,49 @@ SIXTEEN_TEETH_GEAR_DIAMETER = 17.5  # mm
 CIRCUMFERENCE = SIXTEEN_TEETH_GEAR_DIAMETER * math.pi
 ANGLE_RATIO = CIRCUMFERENCE * (1/360)
 
-PRECISION = 100  # 100 intervals
+PRECISION = 1000  # 100 intervals
 # somehow the precision alters the speed, so maybe resulting in bugs
 # if these bugs influences influence the real drawings
 # fuck new algorithm is needed
 
 
+def find_start(f):
+    x = X_LEFT_BOUND
+    while x < X_RIGHT_BOUND:
+        x += X_LENGTH / PRECISION
+        y = f.evaluate(x)
+        if Y_LOWER_BOUND < y < Y_UPPER_BOUND:
+            return x, y
+
+
 class Plotter:
     def __init__(self, current_x=X_LEFT_BOUND, current_y=Y_UPPER_BOUND, lifted=False):
-        self.current_x = current_x
-        self.current_y = current_y
+        self._current_x = current_x
+        self._current_y = current_y
 
         self.lifted = lifted
 
-        # testing range
-        self.move_to(0, 0)
-        self.move_to(X_RIGHT_BOUND, Y_UPPER_BOUND)
-        self.move_to(y=Y_LOWER_BOUND)
-        self.move_to(x=X_LEFT_BOUND)
-        self.move_to(y=Y_UPPER_BOUND)
+    @property
+    def current_x(self):
+        return self._current_x
+
+    @current_x.setter
+    def current_x(self, value):
+        # print('x', value)
+        self._current_x = value
+
+    @property
+    def current_y(self):
+        return self._current_y
+
+    @current_y.setter
+    def current_y(self, value):
+        # print('y', value)
+        self._current_y = value
+
+    @property
+    def coords(self):
+        return self.current_x, self.current_y
 
     def lift(self, wait=True):
         if self.lifted:
@@ -108,13 +133,8 @@ class Plotter:
         motor_z.run_angle(360, -ANGLE_TO_LIFT, wait=wait)
         self.lifted = False
 
-    def move_to(self, x=None, y=None, wait=True, x_wait=False):
-        # no value, no movement
-        if x is None:
-            x = self.current_x
-        if y is None:
-            y = self.current_y
-
+    def move_to(self, coords, wait=True, x_wait=False):
+        x, y = coords
         # same position, no movement needed
         if x == self.current_x and y == self.current_y:
             return
@@ -139,83 +159,85 @@ class Plotter:
         self.current_x = x
         self.current_y = y
 
-    def draw(self, expression):
-        """Draws the expression.
+    def draw(self, f):
+        """Draws the expression
 
         Args:
-            expression (Expression): Expression to draw
+            f (Expression): Expression to draw
+
+        Yields:
+            float: percentage of progress
         """
         # first derative
-        fp = expression.diff()
-
-        self.lift()
-        self.move_to(X_LEFT_BOUND, Y_UPPER_BOUND)
+        fp = f.diff()
 
         x_points = []
         y_points = []
 
+        self.lift()
+
         # calculate timings
         x_speed = (X_MAX_ANGLE_SPEED * ANGLE_RATIO)
-        total_time = X_LENGTH / x_speed
+        total_time = X_LENGTH / x_speed  # t = s / v
         average_time = total_time / PRECISION
 
+        self.move_to(find_start(f))
+
         # draw loop
-
-        # timing debug
-        start_time = time.time()
-
         while self.current_x < X_RIGHT_BOUND:
-            print(f'Coords: {self.current_x:.2f} {self.current_y:.2f}')
             x_angle_speed = X_MAX_ANGLE_SPEED
-            y_speed = fp.evaluate(self.current_x)
-            y_angle_speed = y_speed / ANGLE_RATIO
-            abs_y_angle_speed = abs(y_angle_speed)
+            motor_x.run(x_angle_speed)
 
+            if not (Y_LOWER_BOUND < f.evaluate(self.current_x) < Y_UPPER_BOUND):
+                y_speed = 0.0
+                print('not in bounds')
+            else:
+                y_speed = fp.evaluate(self.current_x)
+            y_angle_speed = y_speed / ANGLE_RATIO
+
+            # speed factor is the ratio of y to y_max
             speed_factor = 1.0
             # if y-speed exceeds, slow down x-motor to retain ratio
-            # speed factor is the ratio of y to y_max
-            # dividing it with our x-speed gives the lowered x-speed retaining ratio
-            if abs_y_angle_speed > Y_MAX_ANGLE_SPEED:
-                speed_factor = abs_y_angle_speed / Y_MAX_ANGLE_SPEED
+            if abs(y_angle_speed) > Y_MAX_ANGLE_SPEED:
+                speed_factor = abs(y_angle_speed / Y_MAX_ANGLE_SPEED)
+                # respect orientation
                 y_angle_speed = math.copysign(Y_MAX_ANGLE_SPEED, y_speed)
                 x_angle_speed /= speed_factor
 
-            motor_y.run(y_angle_speed)
             motor_x.run(x_angle_speed)
+            motor_y.run(y_angle_speed)
 
-            # average time multiplied with speed factor gives the time
+            # average time multiplied with speed factor
+            # gives the actual time for the current speeds
             time_spent = average_time * speed_factor
 
-            # distance = velocity * time | s = v · t
-            self.current_y += (y_angle_speed * ANGLE_RATIO) * time_spent
+            # needed for loop
+            # s = v · t
             self.current_x += (x_angle_speed * ANGLE_RATIO) * time_spent
+            self.current_y += (y_angle_speed * ANGLE_RATIO) * time_spent
 
             # scatter diagram
             x_points.append(self.current_x)
             y_points.append(self.current_y)
-            if speed_factor != 1.0:
-                print(f'{speed_factor=:.2f}')
+
+            percentage = (self.current_x + X_LENGTH / 2) / X_LENGTH
+            yield percentage
+
             wait(time_spent)
-
-        motor_x.hold()
-        motor_y.hold()
-
-        actual = time.time() - start_time
-        print(f'{total_time=:.2f}s')
-        print(f'{actual=:.2f}s')
 
         plt.scatter(x_points, y_points)
         plt.show()
 
 
-def main():
+async def main():
     p = Plotter()
     # tokens = ['(VAL:0.1)', '(VAR:x)', '(TIMES:*)', '(SIN:sin)', '(VAL:30.0)', '(TIMES:*)']
-    tokens = ['(VAL:10)', '(VAR:x)', '(VAL:2.0)', '(POW:^)', '(TIMES:*)']
-    tokens = ['(VAR:x']
+    tokens = ['(VAL:0.1)', '(VAR:x)', '(VAL:2.0)', '(POW:^)', '(TIMES:*)']
     expr = Expression(tokens)
-    p.draw(expr)
+    print(expr)
+    for p in p.draw(expr):
+        print(p)
 
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())

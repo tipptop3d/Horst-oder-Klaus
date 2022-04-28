@@ -1,8 +1,17 @@
-from . import multiply, node, number, constant, variable, ln
+"""Power node"""
+
+from . import constant, ln, multiply, node, number, variable
 
 
 class Pow(node.Node):
-    """Power Node"""
+    """Power node"""
+
+    def __init__(self, left=None, right=None):
+        self.left = left
+        self.right = right
+
+    def copy(self):
+        return Pow(self.left.copy(), self.right.copy())
 
     def evaluate(self, value):
         return self.left.evaluate(value) ** self.right.evaluate(value)

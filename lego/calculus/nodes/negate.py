@@ -1,8 +1,10 @@
+"""Negation node"""
+
 from . import node, number
 
 
 class Negate(node.Node):
-    """Negation Node"""
+    """Negation node"""
 
     def __init__(self, arg):
         self.arg = arg

@@ -1,8 +1,17 @@
+"""Add node"""
+
 from . import node, number
 
 
 class Add(node.Node):
     """Add node"""
+
+    def __init__(self, left=None, right=None):
+        self.left = left
+        self.right = right
+    
+    def copy(self):
+        return Add(self.left.copy(), self.right.copy())
 
     def evaluate(self, value):
         return self.left.evaluate(value) + self.right.evaluate(value)

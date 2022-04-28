@@ -1,10 +1,12 @@
+"""Sin node"""
+
 import math
 
 from . import cos, multiply, node, number
 
 
 class Sin(node.Node):
-    """Negation Node"""
+    """Sin node"""
 
     def __init__(self, arg):
         self.arg = arg

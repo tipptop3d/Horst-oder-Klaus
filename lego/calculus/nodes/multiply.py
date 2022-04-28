@@ -1,8 +1,17 @@
+"""Multiplication node"""
+
 from . import add, divide, node, number
 
 
 class Multiply(node.Node):
-    """Multiplication Node"""
+    """Multiplication node"""
+
+    def __init__(self, left=None, right=None):
+        self.left = left
+        self.right = right
+
+    def copy(self):
+        return Multiply(self.left.copy(), self.right.copy())
 
     def evaluate(self, value):
         return self.left.evaluate(value) * self.right.evaluate(value)

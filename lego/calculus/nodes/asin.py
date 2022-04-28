@@ -1,10 +1,12 @@
+"""Arcsin node"""
+
 import math
 
 from . import divide, multiply, node, number, power, sqrt, subtract
 
 
 class Asin(node.Node):
-    """Negation Node"""
+    """Arcsin node"""
 
     def __init__(self, arg):
         self.arg = arg

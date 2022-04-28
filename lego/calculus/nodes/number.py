@@ -1,8 +1,10 @@
+"""Number node. Multiton"""
+
 from . import node
 
 
 class Number(node.Node):
-    """Number Node"""
+    """Number node. Multiton"""
 
     _instances = dict()
 
@@ -17,11 +19,6 @@ class Number(node.Node):
     def __init__(self, value):
         self.value = value
 
-    def __str__(self):
-        return 'Node <{}>'.format(self.value)
-
-    __repr__ = __str__
-
     def copy(self):
         return Number(self.value)
 
@@ -33,5 +30,3 @@ class Number(node.Node):
 
     def to_infix(self):
         return str(self.value)
-
-    
