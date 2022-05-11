@@ -14,17 +14,17 @@ import uasyncio
 from calculus.expression import Expression
 
 # in mm
-X_LENGTH = 128
+X_LENGTH = 127
 X_LEFT_BOUND = -X_LENGTH/2
 X_RIGHT_BOUND = X_LENGTH/2
 
-Y_LENGTH = 55
+Y_LENGTH = 75
 Y_UPPER_BOUND = Y_LENGTH/2
 Y_LOWER_BOUND = -Y_LENGTH/2
 
 # in °/s
-X_MAX_ANGLE_SPEED = 180
-Y_MAX_ANGLE_SPEED = 180
+X_MAX_ANGLE_SPEED = 360
+Y_MAX_ANGLE_SPEED = 180*3
 
 # in °
 ANGLE_TO_LIFT = 90
@@ -45,7 +45,7 @@ def calculate_angle_ratio(diameter):
     return diameter * math.pi * (1/360)
 
 
-SIXTEEN_TEETH_GEAR_DIAMETER = 17.5  # mm
+SIXTEEN_TEETH_GEAR_DIAMETER = 16.3  # mm
 SIXTEEN_TEETH_ANGLE_RATIO = calculate_angle_ratio(SIXTEEN_TEETH_GEAR_DIAMETER)
 
 TWENTYFOUR_TEETH_GEAR_DIAMETER = 22.0
@@ -96,7 +96,6 @@ class Plotter:
 
         self.lifted = lifted
 
-        # testing range
         # self.move_to((X_RIGHT_BOUND, self.current_y))
         # print('right top complete')
         # wait_time(1000)
@@ -180,80 +179,92 @@ class Plotter:
         self.current_y = y
 
 
-def draw(self, expr):
-    """Main Logic. Draws the function on the paper.
-    First moves the pen to the visible start of the function.
-    Starts the x-motor, calculates speed of y-motor with help of
-    the first derivative. If pen exceeds borders, stop y-motor.
-    Adjust x-speed if y-speeds exceeds the maximum to retain x to y
-    ratio. Calculate the time it should spent with help of the
-    variation of the x speeds and the average x-speed and wait.
+    def draw(self, expr):
+        """Main Logic. Draws the function on the paper.
+        First moves the pen to the visible start of the function.
+        Starts the x-motor, calculates speed of y-motor with help of
+        the first derivative. If pen exceeds borders, stop y-motor.
+        Adjust x-speed if y-speeds exceeds the maximum to retain x to y
+        ratio. Calculate the time it should spent with help of the
+        variation of the x speeds and the average x-speed and wait.
 
-    :param expr: Expression to draw
-    :type expr: Expression
-    :yield: Progress of drawing. Ranging from 0 - 1.
-    :rtype: float
-    """
-    # first derivative
-    f_prime = expr.diff()
+        :param expr: Expression to draw
+        :type expr: Expression
+        :yield: Progress of drawing. Ranging from 0 - 1.
+        :rtype: float
+        """
+        # first derivative
+        f_prime = expr.diff()
 
-    self.lift()
+        self.lift()
 
-    # calculate timings
-    x_speed = (X_MAX_ANGLE_SPEED * angle_ratio['x'])
-    total_time = X_LENGTH / x_speed  # t = s / v
-    average_time = total_time / PRECISION
+        # calculate timings
+        x_speed = (X_MAX_ANGLE_SPEED * angle_ratio['x'])
+        total_time = X_LENGTH / x_speed  # t = s / v
+        average_time = total_time / PRECISION
 
-    self.move_to(find_start(expr))
+        self.move_to(find_start(expr))
 
-    # draw loop
-    while self.current_x < X_RIGHT_BOUND:
-        x_angle_speed = X_MAX_ANGLE_SPEED
-        self.motor_x.run(x_angle_speed)
+        
 
-        # stop y-motor if pen is not in bounds
-        if not Y_LOWER_BOUND < expr.evaluate(self.current_x) < Y_UPPER_BOUND:
-            y_speed = 0.0
-        else:
-            y_speed = f_prime.evaluate(self.current_x)
-        y_angle_speed = y_speed / angle_ratio['y']
+        # draw loop
+        time_spent = 0
+        while self.current_x < X_RIGHT_BOUND:
+            wait_time(time_spent * 1000)
+            x_angle_speed = X_MAX_ANGLE_SPEED
+            # self.motor_x.run(x_angle_speed)
 
-        # speed factor is the ratio of y to y_max
-        speed_factor = 1.0
-        # if y-speed exceeds, slow down x-motor to retain ratio
-        if abs(y_angle_speed) > Y_MAX_ANGLE_SPEED:
-            speed_factor = abs(y_angle_speed / Y_MAX_ANGLE_SPEED)
-            # respect orientation
-            y_angle_speed = math.copysign(Y_MAX_ANGLE_SPEED, y_speed)
-            x_angle_speed /= speed_factor
+            # stop y-motor if pen is not in bounds
+            if not Y_LOWER_BOUND < expr.evaluate(self.current_x) < Y_UPPER_BOUND:
+                y_speed = 0.0
+            else:
+                y_speed = f_prime.evaluate(self.current_x) 
+            y_angle_speed = y_speed * x_angle_speed
 
-        self.motor_y.run(y_angle_speed)
-        self.motor_x.run(x_angle_speed)
+            # speed factor is the ratio of y to y_max
+            speed_factor = 1.0
+            # if y-speed exceeds, slow down x-motor to retain ratio
+            if abs(y_angle_speed) > Y_MAX_ANGLE_SPEED:
+                speed_factor = abs(y_angle_speed / Y_MAX_ANGLE_SPEED)
+                # respect orientation
+                y_angle_speed = math.copysign(Y_MAX_ANGLE_SPEED, y_speed)
+                x_angle_speed /= speed_factor
 
-        # average time multiplied with speed factor
-        # gives the actual time for the current speeds
-        time_spent = average_time * speed_factor
+            print('X-Speed: ', x_angle_speed) # * angle_ratio['x'])
+            print('Y-Speed: ', y_angle_speed) # * angle_ratio['y'])
 
-        # needed for loop
-        # s = v · t
-        self.current_y += (y_angle_speed * angle_ratio['y']) * time_spent
-        self.current_x += (x_angle_speed * angle_ratio['x']) * time_spent
 
-        percentage = (self.current_x + X_LENGTH / 2) / X_LENGTH
-        yield percentage
+            self.motor_x.run(x_angle_speed)
+            self.motor_y.run(y_angle_speed)
 
-        # adjust for ms
-        wait_time(time_spent * 1000)
+            # average time multiplied with speed factor
+            # gives the actual time for the current speeds
+            time_spent = average_time * speed_factor
 
-    self.motor_x.hold()
-    self.motor_y.hold()
+            # needed for loop
+            # s = v · t
+            self.current_x += (x_angle_speed * angle_ratio['x']) * time_spent
+            self.current_y += (y_angle_speed * angle_ratio['y']) * time_spent
 
-    self.move_to((X_LEFT_BOUND, Y_UPPER_BOUND))
+            percentage = (self.current_x + X_LENGTH / 2) / X_LENGTH
+            yield percentage
+
+            # adjust for ms
+            
+
+        self.motor_x.hold()
+        self.motor_y.hold()
+
+        print(1, self.current_x)
+        wait_time(5000)
+
+        self.move_to((X_LEFT_BOUND, Y_UPPER_BOUND))
+        print(2, self.current_x)
 
 
 brick = EV3Brick()
 
-motor_x = Motor(Port.A, gears=[[24, 20], [16]])
+motor_x = Motor(Port.D, gears=[[24, 20], [16]])
 motor_y = Motor(Port.C, gears=[24],
                 positive_direction=Direction.COUNTERCLOCKWISE)
 # motor_z = Motor(Port.C)
@@ -273,16 +284,20 @@ async def print_callback(reader, writer):
     try:
         response = json.loads((res.decode('ascii')))
     except json.JSONDecodeError as err:
+        print('no json')
         reader.aclose()
         return err
 
+    print('tokens: ', response['tokens'])
     expr = Expression(response['tokens'])
     lifted = response['lifted']
     print('Expression: ', expr)
 
     plotter = Plotter(motor_x, motor_y, None, lifted=lifted)
+    
     for percentage in plotter.draw(expr):
-        print(percentage)
+        # print(percentage)
+        pass
 
     reader.aclose()
 
@@ -299,8 +314,18 @@ def debug():
     """Tries to draw without opening a server"""
     plotter = Plotter(motor_x, motor_y, None)
     tokens = ['(VAL:0.0003)', '(VAR:x)', '(VAL:3.0)', '(POW:^)', '(TIMES:*)']
-    tokens = ['VAR:x']
+    # tokens = ['(VAL:0.01)', '(VAR:x)', '(VAL:2.0)', '(POW:^)', '(TIMES:*)']
+    tokens = ['(VAL:15)' ,  '(VAL:0.1)', '(VAR:x)', '(TIMES:*)', '(SIN:sin)', '(TIMES:*)']
+    tokens = ['VAL:2']
     expr = Expression(tokens)
+
+    # print(1, plotter.current_x)
+    # plotter.move_to((X_RIGHT_BOUND, Y_LOWER_BOUND))
+    # print(2, plotter.current_x)
+    # wait_time(2000)
+    # plotter.move_to((X_LEFT_BOUND, Y_UPPER_BOUND))
+    # print(3, plotter.current_x)
+
     for percentage in plotter.draw(expr):
         print(percentage)
 
